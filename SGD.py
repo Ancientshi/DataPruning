@@ -1,6 +1,7 @@
 from main import *
 
 parser = argparse.ArgumentParser(description='Task args')
+parser.add_argument('--save-net', default=1, type=int, help='Save net')
 parser.add_argument('--pos', default=1, type=int, help='DataPruning pos')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
 parser.add_argument('--train-batch-size', default=128, type=int, help='train batch size')
@@ -8,11 +9,13 @@ parser.add_argument('--mode', default='SGD', type=str, help='Task option')
 parser.add_argument('--net-name', default='ResNet50', type=str, help='used net name')
 task_args = parser.parse_args()
 
-def SGD():
+def SGD(save=1):
+    task_args.save_net=save
     trainer = Trainer(task_args=task_args)
     trainer.train_phase()
 
-def SGD_k(k):
+def SGD_k(k,save=0):
+    task_args.save_net=save
     task_args.mode='SGD_k'
     task_args.k=k
     trainer = Trainer(task_args=task_args)
@@ -64,7 +67,9 @@ def get_SGD_loss_acc():
     return np.load(npyPath_loss,allow_pickle=True).item(),np.load(npyPath_acc,allow_pickle=True).item()
 
 if __name__ == "__main__":
-    SGD()
+    #SGD(0)
+    SGD_dataPruning(0.5,1,400500600)
+    
     # SGD_dataPruning()
     # SGD_randomPruning()
     # infer_k(1,1)

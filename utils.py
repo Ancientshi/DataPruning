@@ -50,7 +50,7 @@ def init_params(net):
                 pass
 
 
-term_width = 800
+term_width = 600
 
 TOTAL_BAR_LENGTH = 65.
 last_time = time.time()

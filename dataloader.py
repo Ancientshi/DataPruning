@@ -1,337 +1,338 @@
 import numpy as np
+from typing import Optional, Callable, Any, Tuple
 import pickle
-import cv2
 from torch.utils.data import Dataset, DataLoader
-from torchvision import utils
+import torchvision 
 import torchvision.transforms as transforms
 import torch
 import random
 from PIL import Image
-random.seed(5)
-np.random.seed(88)
+import os
+random.seed(0)
+np.random.seed(0)
 
-cifar10_train_path='''/workspace/DataPruning/cifar-10-python/train'''
-cifar10_test_path='''/workspace/DataPruning/cifar-10-python/test'''
+# cifar10_train_path='''/workspace/DataPruning/cifar-10-python/train'''
+# cifar10_test_path='''/workspace/DataPruning/cifar-10-python/test'''
 
-transform= transforms.Compose([
-    #transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-])
+# transform= transforms.Compose([
+#     #transforms.Resize((224, 224)),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+# ])
 
-with open(cifar10_train_path+'/data_batch_1', 'rb') as fo:
-    dict = pickle.load(fo, encoding='bytes')
+# with open(cifar10_train_path+'/data_batch_1', 'rb') as fo:
+#     dict = pickle.load(fo, encoding='bytes')
 
-def unpickle(file):
-    with open(file, 'rb') as fo:
-        dict = pickle.load(fo, encoding='bytes')
-    return dict
-
-
-def GetPhoto(pixel):
-    assert len(pixel) == 3072
-    r = pixel[0:1024]; r = np.reshape(r, [1,32, 32])
-    g = pixel[1024:2048]; g = np.reshape(g, [1,32, 32])
-    b = pixel[2048:3072]; b = np.reshape(b, [1,32, 32])
-    photo = np.concatenate([r, g, b], 0)
-    # photo=photo.transpose(1,2,0)
-    # #(3, 32, 32)
-    # photo = Image.fromarray(photo) 
-    # photo=transform(photo)
-    photo=torch.tensor(photo, dtype=torch.float32)/255
-    return photo
+# def unpickle(file):
+#     with open(file, 'rb') as fo:
+#         dict = pickle.load(fo, encoding='bytes')
+#     return dict
 
 
-def getTrainDataByKeyword(keyword, size=(224, 224), normalized=False, filelist=[],index=-1):
-    '''
-    :param keyword:'data', 'labels', 'batch_label', 'filenames', 表示需要返回的项目
-    :param size:当keyword 是data时，表示需要返回的图片的尺寸
-    :param normalized:当keyword是data时，表示是否需要归一化
-    :param filelist:一个list， 表示需要使用的文件对象，仅1， 2， 3， 4， 5是有效的，其他数字无效
-    :return:需要返回的数据对象。'data'表示需要返回像素数据。'labels'表示需要返回标签数据。'batch_label'表示需要返回文件标签数据。'filenames'表示需要返回文件的文件名信息。
-    '''
-
-    keyword = str.encode(keyword)
-
-    assert keyword in [b'data', b'labels', b'batch_label', b'filenames']
-    assert type(filelist) is list and len(filelist) != 0
-    assert type(normalized) is bool
-    assert type(size) is tuple
-
-    files = []
-    for i in filelist:
-        if 1 <= i <= 5 and i not in files:
-            files.append(i)
-
-    if len(files) == 0:
-        raise ValueError("No valid input files!")
-
-    if keyword == b'data':
-        data = []
-        for i in files:
-            data.append(unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'data'])
-        data = np.concatenate(data, 0)
-        return data
-        pass
-    if keyword == b'labels':
-        labels = []
-        for i in files:
-            labels += unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'labels']
-        return labels
-        pass
-    elif keyword == b'batch_label':
-        batch_label = []
-        for i in files:
-            batch_label.append(unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'batch_label'])
-        return batch_label
-        pass
-    elif keyword == b'filenames':
-        filenames = []
-        for i in files:
-            filenames += unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'filenames']
-        return filenames
-        pass
-    pass
+# def GetPhoto(pixel):
+#     assert len(pixel) == 3072
+#     r = pixel[0:1024]; r = np.reshape(r, [1,32, 32])
+#     g = pixel[1024:2048]; g = np.reshape(g, [1,32, 32])
+#     b = pixel[2048:3072]; b = np.reshape(b, [1,32, 32])
+#     photo = np.concatenate([r, g, b], 0)
+#     # photo=photo.transpose(1,2,0)
+#     # #(3, 32, 32)
+#     # photo = Image.fromarray(photo) 
+#     # photo=transform(photo)
+#     photo=torch.tensor(photo, dtype=torch.float32)/255
+#     return photo
 
 
-def getTestDataByKeyword(keyword, size=(224, 224), normalized=False):
-    '''
-    :param keyword:'data', 'labels', 'batch_label', 'filenames', 表示需要返回的项目
-    :param size:当keyword 是data时，表示需要返回的图片的尺寸
-    :param normalized:当keyword是data时，表示是否需要归一化
-    :return:需要返回的数据对象。'data'表示需要返回像素数据。'labels'表示需要返回标签数据。'batch_label'表示需要返回文件标签数据。'filenames'表示需要返回文件的文件名信息。
-    '''
-    keyword = str.encode(keyword)
+# def getTrainDataByKeyword(keyword, size=(224, 224), normalized=False, filelist=[],index=-1):
+#     '''
+#     :param keyword:'data', 'labels', 'batch_label', 'filenames', 表示需要返回的项目
+#     :param size:当keyword 是data时，表示需要返回的图片的尺寸
+#     :param normalized:当keyword是data时，表示是否需要归一化
+#     :param filelist:一个list， 表示需要使用的文件对象，仅1， 2， 3， 4， 5是有效的，其他数字无效
+#     :return:需要返回的数据对象。'data'表示需要返回像素数据。'labels'表示需要返回标签数据。'batch_label'表示需要返回文件标签数据。'filenames'表示需要返回文件的文件名信息。
+#     '''
 
-    assert keyword in [b'data', b'labels', b'batch_label', b'filenames']
-    assert type(size) is tuple
-    assert type(normalized) is bool
+#     keyword = str.encode(keyword)
 
-    batch_label = []
-    filenames = []
+#     assert keyword in [b'data', b'labels', b'batch_label', b'filenames']
+#     assert type(filelist) is list and len(filelist) != 0
+#     assert type(normalized) is bool
+#     assert type(size) is tuple
 
-    batch_label.append(unpickle(cifar10_test_path+"/test_batch")[b'batch_label'])
-    labels = unpickle(cifar10_test_path+"/test_batch")[b'labels']
-    data = unpickle(cifar10_test_path+"/test_batch")[b'data']
-    filenames += unpickle(cifar10_test_path+"/test_batch")[b'filenames']
+#     files = []
+#     for i in filelist:
+#         if 1 <= i <= 5 and i not in files:
+#             files.append(i)
 
-    label = keyword
-    if label == b'data':
-        return data
-        pass
-    elif label == b'labels':
-        return labels
-        pass
-    elif label == b'batch_label':
-        return batch_label
-        pass
-    elif label == b'filenames':
-        return filenames
-        pass
-    else:
-        raise NameError
-    pass
+#     if len(files) == 0:
+#         raise ValueError("No valid input files!")
+
+#     if keyword == b'data':
+#         data = []
+#         for i in files:
+#             data.append(unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'data'])
+#         data = np.concatenate(data, 0)
+#         return data
+#         pass
+#     if keyword == b'labels':
+#         labels = []
+#         for i in files:
+#             labels += unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'labels']
+#         return labels
+#         pass
+#     elif keyword == b'batch_label':
+#         batch_label = []
+#         for i in files:
+#             batch_label.append(unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'batch_label'])
+#         return batch_label
+#         pass
+#     elif keyword == b'filenames':
+#         filenames = []
+#         for i in files:
+#             filenames += unpickle(cifar10_train_path+"/data_batch_%d" % i)[b'filenames']
+#         return filenames
+#         pass
+#     pass
 
 
-class trainset(Dataset):
-    def __init__(self,positive='automobile',negative='truck', size=(224, 224)):
-        self.class_lable_dict={
-            'airplane':0,
-            'automobile':1,
-            'bird':2,
-            'cat':3,
-            'deer':4,
-            'dog':5,
-            'frog':6,
-            'horse':7,
-            'ship':8,
-            'truck':9
-        }
-        self.positive_lable=self.class_lable_dict[positive]
-        self.negative_lable=self.class_lable_dict[negative]
-        self.size=size
+# def getTestDataByKeyword(keyword, size=(224, 224), normalized=False):
+#     '''
+#     :param keyword:'data', 'labels', 'batch_label', 'filenames', 表示需要返回的项目
+#     :param size:当keyword 是data时，表示需要返回的图片的尺寸
+#     :param normalized:当keyword是data时，表示是否需要归一化
+#     :return:需要返回的数据对象。'data'表示需要返回像素数据。'labels'表示需要返回标签数据。'batch_label'表示需要返回文件标签数据。'filenames'表示需要返回文件的文件名信息。
+#     '''
+#     keyword = str.encode(keyword)
 
-        labels=getTrainDataByKeyword(keyword='labels', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+#     assert keyword in [b'data', b'labels', b'batch_label', b'filenames']
+#     assert type(size) is tuple
+#     assert type(normalized) is bool
 
-        images=getTrainDataByKeyword(keyword='data', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+#     batch_label = []
+#     filenames = []
 
-        self.labels=labels
-        self.images=images
+#     batch_label.append(unpickle(cifar10_test_path+"/test_batch")[b'batch_label'])
+#     labels = unpickle(cifar10_test_path+"/test_batch")[b'labels']
+#     data = unpickle(cifar10_test_path+"/test_batch")[b'data']
+#     filenames += unpickle(cifar10_test_path+"/test_batch")[b'filenames']
+
+#     label = keyword
+#     if label == b'data':
+#         return data
+#         pass
+#     elif label == b'labels':
+#         return labels
+#         pass
+#     elif label == b'batch_label':
+#         return batch_label
+#         pass
+#     elif label == b'filenames':
+#         return filenames
+#         pass
+#     else:
+#         raise NameError
+#     pass
+
+
+# class trainset(Dataset):
+#     def __init__(self,positive='automobile',negative='truck', size=(224, 224)):
+#         self.class_lable_dict={
+#             'airplane':0,
+#             'automobile':1,
+#             'bird':2,
+#             'cat':3,
+#             'deer':4,
+#             'dog':5,
+#             'frog':6,
+#             'horse':7,
+#             'ship':8,
+#             'truck':9
+#         }
+#         self.positive_lable=self.class_lable_dict[positive]
+#         self.negative_lable=self.class_lable_dict[negative]
+#         self.size=size
+
+#         labels=getTrainDataByKeyword(keyword='labels', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+
+#         images=getTrainDataByKeyword(keyword='data', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+
+#         self.labels=labels
+#         self.images=images
         
 
 
-    def __getitem__(self, index):
-        target=self.labels[index]
-        img=self.images[index]
-        img=GetPhoto(img)
-        return img,target
+#     def __getitem__(self, index):
+#         target=self.labels[index]
+#         img=self.images[index]
+#         img=GetPhoto(img)
+#         return img,target
 
-    def __len__(self):
-        return len(self.labels)
+#     def __len__(self):
+#         return len(self.labels)
 
-class trainset_randomPruning(Dataset):
-    def __init__(self,positive='automobile',negative='truck', size=(224, 224),pruningSize=0.4):
-        self.class_lable_dict={
-            'airplane':0,
-            'automobile':1,
-            'bird':2,
-            'cat':3,
-            'deer':4,
-            'dog':5,
-            'frog':6,
-            'horse':7,
-            'ship':8,
-            'truck':9
-        }
-        self.positive_lable=self.class_lable_dict[positive]
-        self.negative_lable=self.class_lable_dict[negative]
-        self.size=size
-        self.pruningSize=pruningSize
+# class trainset_randomPruning(Dataset):
+#     def __init__(self,positive='automobile',negative='truck', size=(224, 224),pruningSize=0.4):
+#         self.class_lable_dict={
+#             'airplane':0,
+#             'automobile':1,
+#             'bird':2,
+#             'cat':3,
+#             'deer':4,
+#             'dog':5,
+#             'frog':6,
+#             'horse':7,
+#             'ship':8,
+#             'truck':9
+#         }
+#         self.positive_lable=self.class_lable_dict[positive]
+#         self.negative_lable=self.class_lable_dict[negative]
+#         self.size=size
+#         self.pruningSize=pruningSize
 
-        labels=getTrainDataByKeyword(keyword='labels', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+#         labels=getTrainDataByKeyword(keyword='labels', size=self.size, normalized=False, filelist=[1,2,3,4,5])
 
-        images=getTrainDataByKeyword(keyword='data', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+#         images=getTrainDataByKeyword(keyword='data', size=self.size, normalized=False, filelist=[1,2,3,4,5])
 
-        self.labels=labels
-        self.images=images
+#         self.labels=labels
+#         self.images=images
 
-        self.handle_dataPruning()
+#         self.handle_dataPruning()
 
-    def _handle_dataPruning(self):
-        length=len(self.data_list)
-        dataToDelete=np.random.randint(length,size=int(length*self.pruningSize))
-        #1是要删的
-        filters=np.zeros(length)
-        for delIndex in dataToDelete:
-            filters[delIndex]=1
+#     def _handle_dataPruning(self):
+#         length=len(self.data_list)
+#         dataToDelete=np.random.randint(length,size=int(length*self.pruningSize))
+#         #1是要删的
+#         filters=np.zeros(length)
+#         for delIndex in dataToDelete:
+#             filters[delIndex]=1
         
-        data_list=[]
-        for i,flag in enumerate(filters):
-            if flag==0:
-                data_list.append(self.data_list[i])
-        self.data_list=data_list[:int(length*(1-self.pruningSize))]
+#         data_list=[]
+#         for i,flag in enumerate(filters):
+#             if flag==0:
+#                 data_list.append(self.data_list[i])
+#         self.data_list=data_list[:int(length*(1-self.pruningSize))]
 
 
 
-    def __getitem__(self, index):
-        target=self.labels[index]
-        img=self.images[index]
-        img=GetPhoto(img)
-        return img,target
+#     def __getitem__(self, index):
+#         target=self.labels[index]
+#         img=self.images[index]
+#         img=GetPhoto(img)
+#         return img,target
 
 
-    def __len__(self):
-        return len(self.labels)
+#     def __len__(self):
+#         return len(self.labels)
 
 
-class trainset_dataPruning(Dataset):
-    def __init__(self,positive='automobile',negative='truck', size=(224, 224),lossChangePath='',pruningSize=0.5,pos=1):
-        self.class_lable_dict={
-            'airplane':0,
-            'automobile':1,
-            'bird':2,
-            'cat':3,
-            'deer':4,
-            'dog':5,
-            'frog':6,
-            'horse':7,
-            'ship':8,
-            'truck':9
-        }
-        self.positive_lable=self.class_lable_dict[positive]
-        self.negative_lable=self.class_lable_dict[negative]
-        self.size=size
-        self.lossChangePath=lossChangePath
-        self.pruningSize=pruningSize
-        self.pos=pos
+# class trainset_dataPruning(Dataset):
+#     def __init__(self,positive='automobile',negative='truck', size=(224, 224),lossChangePath='',pruningSize=0.5,pos=1):
+#         self.class_lable_dict={
+#             'airplane':0,
+#             'automobile':1,
+#             'bird':2,
+#             'cat':3,
+#             'deer':4,
+#             'dog':5,
+#             'frog':6,
+#             'horse':7,
+#             'ship':8,
+#             'truck':9
+#         }
+#         self.positive_lable=self.class_lable_dict[positive]
+#         self.negative_lable=self.class_lable_dict[negative]
+#         self.size=size
+#         self.lossChangePath=lossChangePath
+#         self.pruningSize=pruningSize
+#         self.pos=pos
 
-        labels=getTrainDataByKeyword(keyword='labels', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+#         labels=getTrainDataByKeyword(keyword='labels', size=self.size, normalized=False, filelist=[1,2,3,4,5])
 
-        images=getTrainDataByKeyword(keyword='data', size=self.size, normalized=False, filelist=[1,2,3,4,5])
+#         images=getTrainDataByKeyword(keyword='data', size=self.size, normalized=False, filelist=[1,2,3,4,5])
 
-        self.labels=labels
-        self.images=images
+#         self.labels=labels
+#         self.images=images
 
-        self.handle_dataPruning()
+#         self.handle_dataPruning()
 
-    def handle_dataPruning(self):
-        npyPath=self.lossChangePath
-        lossChange_dict=np.load(self.lossChangePath, allow_pickle=True).item()
-        lossChange_dict_sorted=sorted(lossChange_dict.items(), key = lambda kv:(kv[1], kv[0]),reverse=False)
-        #找到前一千条
-        if self.pos==1:
-            dataToDelete=np.array(lossChange_dict_sorted)[:int(len(lossChange_dict)*self.pruningSize),[0]].flatten().astype(np.int16)
-        elif self.pos==2:
-            prunNum=int(len(lossChange_dict)*self.pruningSize/2)
-            dataToDelete1=np.array(lossChange_dict_sorted)[:prunNum,[0]].flatten().astype(np.int16)
-            dataToDelete2=np.array(lossChange_dict_sorted)[-prunNum:,[0]].flatten().astype(np.int16)
-            dataToDelete=np.concatenate((dataToDelete1,dataToDelete2))
-        elif self.pos==3:
-            dataToDelete=np.array(lossChange_dict_sorted)[-int(len(lossChange_dict)*self.pruningSize):,[0]].flatten().astype(np.int16)
+#     def handle_dataPruning(self):
+#         npyPath=self.lossChangePath
+#         lossChange_dict=np.load(self.lossChangePath, allow_pickle=True).item()
+#         lossChange_dict_sorted=sorted(lossChange_dict.items(), key = lambda kv:(kv[1], kv[0]),reverse=False)
+#         #找到前一千条
+#         if self.pos==1:
+#             dataToDelete=np.array(lossChange_dict_sorted)[:int(len(lossChange_dict)*self.pruningSize),[0]].flatten().astype(np.int16)
+#         elif self.pos==2:
+#             prunNum=int(len(lossChange_dict)*self.pruningSize/2)
+#             dataToDelete1=np.array(lossChange_dict_sorted)[:prunNum,[0]].flatten().astype(np.int16)
+#             dataToDelete2=np.array(lossChange_dict_sorted)[-prunNum:,[0]].flatten().astype(np.int16)
+#             dataToDelete=np.concatenate((dataToDelete1,dataToDelete2))
+#         elif self.pos==3:
+#             dataToDelete=np.array(lossChange_dict_sorted)[-int(len(lossChange_dict)*self.pruningSize):,[0]].flatten().astype(np.int16)
         
-        #1-10000 变成0-9999
-        dataToDelete=dataToDelete-1
+#         #1-10000 变成0-9999
+#         dataToDelete=dataToDelete-1
 
-        #1是要删的
-        filters=np.zeros(len(lossChange_dict))
-        for delIndex in dataToDelete:
-            filters[delIndex]=1
+#         #1是要删的
+#         filters=np.zeros(len(lossChange_dict))
+#         for delIndex in dataToDelete:
+#             filters[delIndex]=1
         
-        data_list=[]
-        for i,flag in enumerate(filters):
-            if flag==0:
-                data_list.append(self.data_list[i])
-        # random.shuffle(data_list)
-        self.data_list=data_list
-        # print(len(self.data_list))
-        # sys.exit()
+#         data_list=[]
+#         for i,flag in enumerate(filters):
+#             if flag==0:
+#                 data_list.append(self.data_list[i])
+#         # random.shuffle(data_list)
+#         self.data_list=data_list
+#         # print(len(self.data_list))
+#         # sys.exit()
 
-    def __getitem__(self, index):
-        target=self.labels[index]
-        img=self.images[index]
-        img=GetPhoto(img)
-        return img,target
-
-
-    def __len__(self):
-        return len(self.labels)
-
-class testset(Dataset):
-    def __init__(self,positive='automobile',negative='truck', size=(224, 224)):
-        self.class_lable_dict={
-            'airplane':0,
-            'automobile':1,
-            'bird':2,
-            'cat':3,
-            'deer':4,
-            'dog':5,
-            'frog':6,
-            'horse':7,
-            'ship':8,
-            'truck':9
-        }
-        self.positive_lable=self.class_lable_dict[positive]
-        self.negative_lable=self.class_lable_dict[negative]
-        self.size=size
-
-        labels=getTestDataByKeyword(keyword='labels', size=self.size, normalized=False)
-
-        images=getTestDataByKeyword(keyword='data', size=self.size, normalized=False)
-
-        self.labels=labels
-        self.images=images
-
-    def __getitem__(self, index):
-        target=self.labels[index]
-        img=self.images[index]
-        img=GetPhoto(img)
-        return img,target
+#     def __getitem__(self, index):
+#         target=self.labels[index]
+#         img=self.images[index]
+#         img=GetPhoto(img)
+#         return img,target
 
 
-    def __len__(self):
-        return len(self.labels)
+#     def __len__(self):
+#         return len(self.labels)
 
-class CIFAR10_DataPruning(VisionDataset):
+# class testset(Dataset):
+#     def __init__(self,positive='automobile',negative='truck', size=(224, 224)):
+#         self.class_lable_dict={
+#             'airplane':0,
+#             'automobile':1,
+#             'bird':2,
+#             'cat':3,
+#             'deer':4,
+#             'dog':5,
+#             'frog':6,
+#             'horse':7,
+#             'ship':8,
+#             'truck':9
+#         }
+#         self.positive_lable=self.class_lable_dict[positive]
+#         self.negative_lable=self.class_lable_dict[negative]
+#         self.size=size
+
+#         labels=getTestDataByKeyword(keyword='labels', size=self.size, normalized=False)
+
+#         images=getTestDataByKeyword(keyword='data', size=self.size, normalized=False)
+
+#         self.labels=labels
+#         self.images=images
+
+#     def __getitem__(self, index):
+#         target=self.labels[index]
+#         img=self.images[index]
+#         img=GetPhoto(img)
+#         return img,target
+
+
+#     def __len__(self):
+#         return len(self.labels)
+
+class CIFAR10_DataPruning(torchvision.datasets.vision.VisionDataset):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
 
     Args:
@@ -382,7 +383,7 @@ class CIFAR10_DataPruning(VisionDataset):
             pos=1
     ) -> None:
 
-        super(CIFAR10, self).__init__(root, transform=transform,
+        super(CIFAR10_DataPruning, self).__init__(root, transform=transform,
                                       target_transform=target_transform)
 
         self.datapruning=datapruning
@@ -391,14 +392,7 @@ class CIFAR10_DataPruning(VisionDataset):
         self.pos=pos
 
         self.train = train  # training set or test set
-
-        if download:
-            self.download()
-
-        if not self._check_integrity():
-            raise RuntimeError('Dataset not found or corrupted.' +
-                               ' You can use download=True to download it')
-
+        
         if self.train:
             downloaded_list = self.train_list
         else:
@@ -489,9 +483,6 @@ class CIFAR10_DataPruning(VisionDataset):
 
     def _load_meta(self) -> None:
         path = os.path.join(self.root, self.base_folder, self.meta['filename'])
-        if not check_integrity(path, self.meta['md5']):
-            raise RuntimeError('Dataset metadata file not found or corrupted.' +
-                               ' You can use download=True to download it')
         with open(path, 'rb') as infile:
             data = pickle.load(infile, encoding='latin1')
             self.classes = data[self.meta['key']]
@@ -521,21 +512,6 @@ class CIFAR10_DataPruning(VisionDataset):
 
     def __len__(self) -> int:
         return len(self.data)
-
-    def _check_integrity(self) -> bool:
-        root = self.root
-        for fentry in (self.train_list + self.test_list):
-            filename, md5 = fentry[0], fentry[1]
-            fpath = os.path.join(root, self.base_folder, filename)
-            if not check_integrity(fpath, md5):
-                return False
-        return True
-
-    def download(self) -> None:
-        if self._check_integrity():
-            print('Files already downloaded and verified')
-            return
-        download_and_extract_archive(self.url, self.root, filename=self.filename, md5=self.tgz_md5)
 
     def extra_repr(self) -> str:
         return "Split: {}".format("Train" if self.train is True else "Test")

@@ -90,6 +90,7 @@ class Trainer(object):
     def __init__(self,task_args=None):
         self.args = trainer_args
         if task_args!=None:
+            self.args.save_net=task_args.save_net
             self.args.lr=task_args.lr
             self.args.train_batch_size=task_args.train_batch_size
             self.args.net_name=task_args.net_name
@@ -100,7 +101,7 @@ class Trainer(object):
         # Data
         print('==> Preparing data..')
         self.train_data  = CIFAR10_DataPruning(
-            root='./cifar-10-python', 
+            root=self.args.data_path, 
             train=True, 
             download=False, 
             transform=transform_train,
@@ -120,30 +121,30 @@ class Trainer(object):
         self.q=-1
 
         if self.mode=='SGD':
-            self.args.save_path='/workspace/DataPruning/TrainPhase/'
+            self.args.save_path='/home/yunxshi/workspace/DataPruning/TrainPhase/'
         elif self.mode=='SGD_k':
             self.k=task_args.k
             #k在批次中的index，8888%200=88，索引是87
             self.index_inBatch=(self.k-1)%self.B
             #处于一个epoch中的第几个batch，(8888-1)/200=44.435,所以是第44+1个batch,由于batch in [0,I-1],所以44+1-1=44
             self.q=math.floor((self.k-1)/self.B)
-            self.args.save_path='/workspace/DataPruning/TrainPhase/'
+            self.args.save_path='/home/yunxshi/workspace/DataPruning/TrainPhase/'
         elif self.mode=='Infer_k':
             self.k=task_args.k
             #k在批次中的index，8888%200=88，索引是87
             self.index_inBatch=(self.k-1)%self.B
             #处于一个epoch中的第几个batch，(8888-1)/200=44.435,所以是第44+1个batch,由于batch in [0,I-1],所以44+1-1=44
             self.q=math.floor((self.k-1)/self.B)
-            self.args.save_path='/workspace/DataPruning/InferPhase/'
+            self.args.save_path='/home/yunxshi/workspace/DataPruning/InferPhase/'
         elif self.mode=='Infer_all':
-            self.args.save_path='/workspace/DataPruning/InferPhase/'
+            self.args.save_path='/home/yunxshi/workspace/DataPruning/InferPhase/'
         elif self.mode=='SGD_dataPruning':
-            self.args.save_path='/workspace/DataPruning/TrainPhase_dataPruning/'
+            self.args.save_path='/home/yunxshi/workspace/DataPruning/TrainPhase_dataPruning/'
             self.pos=task_args.pos
             self.lossChangePath=task_args.lossChangePath
             self.pruningSize=task_args.pruningSize
             self.train_data_dataPruning  = CIFAR10_DataPruning(
-                root='./cifar-10-python', 
+                root=self.args.data_path, 
                 train=True, 
                 download=False, 
                 transform=transform_train,
@@ -154,10 +155,10 @@ class Trainer(object):
             )
             self.trainloader_dataPruning = DataLoader(self.train_data_dataPruning, batch_size=self.args.train_batch_size,shuffle=False, num_workers=1,worker_init_fn=seed_worker,generator=g)
         elif self.mode=='SGD_randomPruning':
-            self.args.save_path='/workspace/DataPruning/TrainPhase_randomPruning/'
+            self.args.save_path='/home/yunxshi/workspace/DataPruning/TrainPhase_randomPruning/'
             self.pruningSize=task_args.pruningSize
             self.train_data_randomPruning  = CIFAR10_DataPruning(
-                root='./cifar-10-python', 
+                root=self.args.data_path, 
                 train=True, 
                 download=False, 
                 transform=transform_train,
@@ -177,7 +178,7 @@ class Trainer(object):
 
 
         self.test_data  = CIFAR10_DataPruning(
-            root='./cifar-10-python', 
+            root=self.args.data_path, 
             train=False, 
             download=False, 
             transform=transform_test,
@@ -234,7 +235,7 @@ class Trainer(object):
         # net = RegNetX_200MF()
 
         self.net = net.to(self.device)
-        #init_params(self.net)
+        init_params(self.net)
 
     def getGrad(self,loss=None):
         '''
@@ -647,42 +648,38 @@ class Trainer(object):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             return inputs, targets
                     
-    def saveParam(self,i,lr,testLoss,testAcc):
-        try:
-            self.testAcc_dict[i]=testAcc
-            self.testLoss_dict[i]=testLoss
-        except:
-            self.testLoss_dict={}
-            self.testAcc_dict={}
-            self.testLoss_dict[i]=testLoss
-            self.testAcc_dict[i]=testAcc
-
-
-        # 保存(epoch,batch_idx)之时的，网络中的参数，以及在验证集上的损失
-        state = {'net': self.net.state_dict(),
-                'iter': i,
-                'lr':lr,
-                'testLoss':testLoss,
-                'testAcc':testAcc}
-        if not os.path.exists(self.dirName):
-            os.makedirs(self.dirName)
-        torch.save(state,self.dirName+'''/phase_%s.pth'''%(i))
+    def saveParam(self,i,lr):
+        if self.args.save_net:
+            # 保存(epoch,batch_idx)之时的，网络中的参数，以及在验证集上的损失
+            state = {'net': self.net.state_dict(),
+                    'iter': i,
+                    'lr':lr
+                    }
+            if not os.path.exists(self.dirName):
+                os.makedirs(self.dirName)
+            torch.save(state,self.dirName+'''/phase_%s.pth'''%(i))
+        else:
+            pass
 
     # Training
     def train(self,epoch):
-        #print('\nEpoch: %d' % epoch)
+        if self.mode=='SGD' or self.mode=='SGD_k':
+            dataLoader=self.trainloader
+        elif self.mode=='SGD_dataPruning':
+            dataLoader=self.trainloader_dataPruning
+        elif self.mode=='SGD_randomPruning':
+            dataLoader=self.trainloader_randomPruning
+        
+        print('\nEpoch: %d' % epoch)
         self.net.train()
         train_loss = 0
         correct = 0
         total = 0
-        for batch_idx, (inputs, targets) in enumerate(self.trainloader):
+        for batch_idx, (inputs, targets) in enumerate(dataLoader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
             #k!=-1 为counter-sgd，删掉Xk
             if self.mode=='SGD_k' and self.k!=-1 and batch_idx==self.q:
-                # print('batch_idx为%s'%batch_idx)
-                # print('self.q为%s'%self.q)
-                # print('self.index_inBatch为%s'%self.index_inBatch)
                 inputs = inputs[torch.arange(inputs.size(0))!=self.index_inBatch]
                 targets = targets[torch.arange(targets.size(0))!=self.index_inBatch]
 
@@ -699,96 +696,21 @@ class Trainer(object):
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
-            testLoss,testAcc=self.test(epoch)
 
-            progress_bar(batch_idx, len(self.trainloader), 'TrainLoss: %.3f | TestLoss: %.3f | Acc: %.3f%% (%d/%d)'
-                        % (train_loss/(batch_idx+1),testLoss, 100.*correct/total, correct, total))
+            progress_bar(batch_idx, len(self.trainloader), 'TrainLoss: %.3f | TrainAcc: %.3f%% (%d/%d)'
+                        % (train_loss/(batch_idx+1),100.*correct/total, correct, total))
             
             i=epoch*self.C+batch_idx
             
-            #在训之后存loss
-            #正常train
-            if self.mode=='SGD':
-                self.saveParam(i,self.getLr(),testLoss,testAcc)
-            #counter train
-            elif self.mode=='SGD_k':
-                self.testAcc_counter_dict[i]=testAcc
-                self.testLoss_counter_dict[i]=testLoss
-
-    def train_randomPruning(self,epoch):
-        self.net.train()
-        train_loss = 0
-        correct = 0
-        total = 0
-        for batch_idx, (inputs, targets) in enumerate(self.trainloader_randomPruning):
-            inputs, targets = inputs.to(self.device), targets.to(self.device)
-
-            self.optimizer.zero_grad()
-            outputs = self.net(inputs)
-            loss = self.criterion(outputs, targets)
-
-            loss=torch.mean(loss,dim =0)
-            loss.backward(retain_graph=True)
-            self.optimizer.step()
-
-
-            train_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-            testLoss,testAcc=self.test(epoch)
-            
-            progress_bar(batch_idx, len(self.trainloader), 'TrainLoss: %.3f | TestLoss: %.3f | Acc: %.3f%% (%d/%d)'
-                        % (train_loss/(batch_idx+1),testLoss, 100.*correct/total, correct, total))
-            
-            i=epoch*self.C+batch_idx
+            self.saveParam(i,self.getLr())
             try:
-                self.testLoss_dict[i]=testLoss
-                self.testAcc_dict[i]=testAcc
+                self.trainLoss_dict[i]=train_loss/(batch_idx+1)
+                self.trainAcc_dict[i]=correct/total
             except:
-                self.testLoss_dict={}
-                self.testAcc_dict={}
-                self.testLoss_dict[i]=testLoss
-                self.testAcc_dict[i]=testAcc
-
-    def train_dataPruning(self,epoch):
-        self.net.train()
-        train_loss = 0
-        correct = 0
-        total = 0
-        for batch_idx, (inputs, targets) in enumerate(self.trainloader_dataPruning):
-            inputs, targets = inputs.to(self.device), targets.to(self.device)
-
-            self.optimizer.zero_grad()
-            outputs = self.net(inputs)
-            loss = self.criterion(outputs, targets)
-
-            loss=torch.mean(loss,dim =0)
-            loss.backward(retain_graph=True)
-            self.optimizer.step()
-
-
-            train_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-            testLoss,testAcc=self.test(epoch)
-
-            progress_bar(batch_idx, len(self.trainloader), 'TrainLoss: %.3f | TestLoss: %.3f | Acc: %.3f%% (%d/%d)'
-                        % (train_loss/(batch_idx+1),testLoss, 100.*correct/total, correct, total))
-            
-            i=epoch*self.C+batch_idx
-            
-
-            try:
-                self.testLoss_dict[i]=testLoss
-                self.testAcc_dict[i]=testAcc
-            except:
-                self.testLoss_dict={}
-                self.testAcc_dict={}
-                self.testLoss_dict[i]=testLoss
-                self.testAcc_dict[i]=testAcc
-
+                self.trainLoss_dict={}
+                self.trainAcc_dict={}
+                self.trainLoss_dict[i]=train_loss/(batch_idx+1)
+                self.trainAcc_dict[i]= correct/total
 
     def summary(self):
         #输出每层网络参数信息
@@ -812,8 +734,19 @@ class Trainer(object):
                 total += targets.size(0)
                 correct += predicted.eq(targets).sum().item()
 
-                # progress_bar(batch_idx, len(self.testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                #             % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                progress_bar(batch_idx, len(self.testloader), 'TestLoss: %.3f | TestAcc: %.3f%% (%d/%d)'
+                            % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+
+        i=epoch*self.C
+        try:
+            self.testLoss_dict[i]=test_loss/(batch_idx+1)
+            self.testAcc_dict[i]=correct/total
+        except:
+            self.testLoss_dict={}
+            self.testAcc_dict={}
+            self.testLoss_dict[i]=test_loss/(batch_idx+1)
+            self.testAcc_dict[i]=correct/total
+
         return test_loss/(batch_idx+1),correct/total
     
     def inferAll(self,w_i=50):
@@ -829,51 +762,33 @@ class Trainer(object):
         k=self.k
         #k为-1，是正常SGD
         if self.mode=='SGD':
-            self.saveParam(-1,self.getLr(),None,None)
-            for epoch in range(self.args.epoch):
-                # adjust_learning_rate(optimizer=self.optimizer,warmup_epoch=10, current_epoch=epoch, max_epoch=self.args.epoch, lr_min=0.001, lr_max=self.args.lr,
-                #     warmup=True)
-                self.train(epoch)
-                self.scheduler.step()
-            self.drawLoss()
-        #datafruning下的
+            self.saveParam(-1,self.getLr())
+        elif self.mode=='SGD_k':
+            #load初始参数
+            checkpoint=self.getCheckpoint(-1)
+            self.net.load_state_dict(checkpoint['net'])
         elif self.mode=='SGD_dataPruning':
-            #w_i=int(self.lossChangePath.split('_')[1].split('.')[0])
-            # if os.path.exists(self.dirName+'/testLoss_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i)) and os.path.exists(self.dirName+'/testAcc_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i)):
-            #     return np.load(self.dirName+'/testLoss_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i),allow_pickle=True).item(),np.load(self.dirName+'/testAcc_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i),allow_pickle=True).item()
-            # else:
-                #load初始参数
-                checkpoint=self.getCheckpoint(-1)
-                self.net.load_state_dict(checkpoint['net'])
-                for epoch in range(self.args.epoch):
-                    self.train_dataPruning(epoch)
-                    self.scheduler.step()
-                self.drawLoss()
-                return self.testLoss_dict,self.testAcc_dict
-
-        elif self.mode=='SGD_randomPruning':
-            if os.path.exists(self.dirName+'/testLoss_%s.npy'%self.pruningSize) and os.path.exists(self.dirName+'/testAcc_%s.npy'%self.pruningSize):
-                return np.load(self.dirName+'/testLoss_%s.npy'%self.pruningSize,allow_pickle=True).item(),np.load(self.dirName+'/testAcc_%s.npy'%self.pruningSize,allow_pickle=True).item()
+            w_i=int(self.lossChangePath.split('_')[1].split('.')[0])
+            if os.path.exists(self.dirName+'/testLoss_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i)) and \
+            os.path.exists(self.dirName+'/testAcc_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i)):
+                return 
             else:
                 #load初始参数
                 checkpoint=self.getCheckpoint(-1)
                 self.net.load_state_dict(checkpoint['net'])
-                for epoch in range(self.args.epoch):
-                    self.train_randomPruning(epoch)
-                    self.scheduler.step()
-                self.drawLoss()
-                return self.testLoss_dict,self.testAcc_dict
-
-        elif self.mode=='SGD_k':
-            self.testLoss_counter_dict={}
-            self.testAcc_counter_dict={}
-            #load初始参数
-            checkpoint=self.getCheckpoint(-1)
-            self.net.load_state_dict(checkpoint['net'])
-            for epoch in range(self.args.epoch):
-                self.train(epoch)
-                self.scheduler.step()
-            return self.testLoss_counter_dict,self.testAcc_counter_dict
+        elif self.mode=='SGD_randomPruning':
+            if os.path.exists(self.dirName+'/testLoss_%s.npy'%self.pruningSize) and \
+            os.path.exists(self.dirName+'/testAcc_%s.npy'%self.pruningSize):
+                return
+            else:
+                #load初始参数
+                checkpoint=self.getCheckpoint(-1)
+                self.net.load_state_dict(checkpoint['net'])
+        for epoch in range(self.args.epoch):
+            self.train(epoch)
+            self.test(epoch)
+            self.scheduler.step()        
+        self.drawLoss()
 
     def realLossChange(self):
         counter_loss_dict,counter_acc_dict=self.train_phase()
@@ -886,20 +801,28 @@ class Trainer(object):
     def drawLoss(self):
         if not os.path.exists(self.dirName):
             os.makedirs(self.dirName)
-        if self.mode=='SGD':
+        if self.mode=='SGD' or self.mode=='SGD_randomPruning':
+            np.save(self.dirName+'/trainLoss_%s.npy'%'SGD',self.trainLoss_dict)
+            np.save(self.dirName+'/trainAcc_%s.npy'%'SGD',self.trainAcc_dict)
             np.save(self.dirName+'/testLoss_%s.npy'%'SGD',self.testLoss_dict)
             np.save(self.dirName+'/testAcc_%s.npy'%'SGD',self.testAcc_dict)
+
         elif self.mode=='SGD_dataPruning':
             w_i=int(self.lossChangePath.split('_')[1].split('.')[0])
+            np.save(self.dirName+'/trainLoss_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i),self.trainLoss_dict)
+            np.save(self.dirName+'/trainAcc_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i),self.trainAcc_dict)
             np.save(self.dirName+'/testLoss_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i),self.testLoss_dict)
             np.save(self.dirName+'/testAcc_%s_%s_%s.npy'%(self.pruningSize,self.pos,w_i),self.testAcc_dict)
-        elif self.mode=='SGD_randomPruning':
-            np.save(self.dirName+'/testLoss_%s.npy'%self.pruningSize,self.testLoss_dict)
-            np.save(self.dirName+'/testAcc_%s.npy'%self.pruningSize,self.testAcc_dict)
+
+        elif self.mode=='SGD_k':
+            return 
+
         plt.figure(1,figsize=(16,9))
         plt.cla()
-        plt.plot(range(len(self.testLoss_dict)), self.testLoss_dict.values(), label="loss on valid")
-        plt.plot(range(len(self.testLoss_dict)), self.testAcc_dict.values(), label="acc on valid")
+        plt.plot(self.trainLoss_dict.keys(), self.trainLoss_dict.values(), label="loss on train")
+        plt.plot(self.trainAcc_dict.keys(), self.trainAcc_dict.values(), label="acc on train")
+        plt.plot(self.testLoss_dict.keys(), self.testLoss_dict.values(), label="loss on valid")
+        plt.plot(self.testAcc_dict.keys(), self.testAcc_dict.values(), label="acc on valid")
 
         plt.xlabel("iter")
         plt.ylabel("loss and acc")
