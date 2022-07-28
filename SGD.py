@@ -4,21 +4,23 @@ parser = argparse.ArgumentParser(description='Task args')
 parser.add_argument('--save-net', default=1, type=int, help='Save net')
 parser.add_argument('--pos', default=1, type=int, help='DataPruning pos')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
-parser.add_argument('--train-batch-size', default=128, type=int, help='train batch size')
+parser.add_argument('--train-batch-size', default=1000, type=int, help='train batch size')
 parser.add_argument('--mode', default='SGD', type=str, help='Task option')
-parser.add_argument('--net-name', default='ResNet50', type=str, help='used net name')
+parser.add_argument('--net-name', default='MyNet', type=str, help='used net name')
 task_args = parser.parse_args()
 
-def SGD(save=1):
+def SGD(save=1,test_everyIter=False):
     task_args.save_net=save
     trainer = Trainer(task_args=task_args)
+    trainer.test_everyIter=test_everyIter
     trainer.train_phase()
 
-def SGD_k(k,save=0):
+def SGD_k(k,save=0,test_everyIter=False):
     task_args.save_net=save
     task_args.mode='SGD_k'
     task_args.k=k
     trainer = Trainer(task_args=task_args)
+    trainer.test_everyIter=test_everyIter
     #0: 4.172325134277344e-07的形式
     realLossChange_dict=trainer.realLossChange()
     return realLossChange_dict
@@ -31,6 +33,7 @@ def infer_k(k,w_i,use_apx_ju=False):
     task_args.k=k
     trainer = Trainer(task_args=task_args)
     trainer.use_apx_ju=use_apx_ju
+    trainer.use_getBatch_init=True
     loss_change_apx_wi=trainer.infer(w_i=w_i)
     print('loss_change_apx_w%s'%w_i,loss_change_apx_wi)
     return loss_change_apx_wi
@@ -46,32 +49,47 @@ def infer_all(w_i,kList=[]):
     return loss_change_apx_wi
 
 def SGD_dataPruning(pruningSize=0.6,pos=1,w_i=100):
-    lossChangePath='/workspace/DataPruning/LossChange/MyNet_1000_0.1/apxLossChangeAll_%s.npy'%w_i
+    lossChangePath='LossChange/MyNet_1000_0.1/apxLossChangeAll_%s.npy'%w_i
+    task_args.save_net=0
     task_args.mode='SGD_dataPruning'
     task_args.lossChangePath=lossChangePath
     task_args.pruningSize=pruningSize
     task_args.pos=pos
     trainer = Trainer(task_args=task_args)
-    return trainer.train_phase()
+    trainer.train_phase()
+    return  trainer.trainLoss_dict,\
+            trainer.trainAcc_dict,\
+            trainer.testLoss_dict,\
+            trainer.testAcc_dict
 
 def SGD_randomPruning(pruningSize=0.6):
+    task_args.save_net=0
     task_args.mode='SGD_randomPruning'
     task_args.pruningSize=pruningSize
     trainer = Trainer(task_args=task_args)
-    return trainer.train_phase()
+    trainer.train_phase()
+    return  trainer.trainLoss_dict,\
+            trainer.trainAcc_dict,\
+            trainer.testLoss_dict,\
+            trainer.testAcc_dict
 
 def get_SGD_loss_acc():
     dirName='''%s_%s_%s'''%(task_args.net_name,task_args.train_batch_size,task_args.lr)
-    npyPath_loss='''/workspace/DataPruning/TrainPhase/%s/testLoss_SGD.npy'''%dirName
-    npyPath_acc='''/workspace/DataPruning/TrainPhase/%s/testAcc_SGD.npy'''%dirName
-    return np.load(npyPath_loss,allow_pickle=True).item(),np.load(npyPath_acc,allow_pickle=True).item()
+    npyPath_train_loss='''/home/yunxshi/Data/workspace/DataPruning/TrainPhase/%s/trainLoss_SGD.npy'''%dirName
+    npyPath_train_acc='''/home/yunxshi/Data/workspace/DataPruning/TrainPhase/%s/trainAcc_SGD.npy'''%dirName
+    npyPath_test_loss='''/home/yunxshi/Data/workspace/DataPruning/TrainPhase/%s/testLoss_SGD.npy'''%dirName
+    npyPath_test_acc='''/home/yunxshi/Data/workspace/DataPruning/TrainPhase/%s/testAcc_SGD.npy'''%dirName
+    return  np.load(npyPath_train_loss,allow_pickle=True).item(),\
+            np.load(npyPath_train_acc,allow_pickle=True).item(),\
+            np.load(npyPath_test_loss,allow_pickle=True).item(),\
+            np.load(npyPath_test_acc,allow_pickle=True).item()
 
 if __name__ == "__main__":
-    #SGD(0)
-    SGD_dataPruning(0.5,1,400500600)
+    SGD(1,True)
+    #SGD_dataPruning(0.5,1,900)
     
     # SGD_dataPruning()
-    # SGD_randomPruning()
+    #SGD_randomPruning(0.5)
     # infer_k(1,1)
     # infer_k(1,2)
     # infer_k(1,3)

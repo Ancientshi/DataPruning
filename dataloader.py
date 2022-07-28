@@ -429,54 +429,41 @@ class CIFAR10_DataPruning(torchvision.datasets.vision.VisionDataset):
         for delIndex in dataToDelete:
             filters[delIndex]=1
         
-        data_list=[]
-        for i,flag in enumerate(filters):
-            if flag==0:
-                data_list.append(self.data_list[i])
-
         data=[]
         targets=[]
 
-        data_list=[]
         for i,flag in enumerate(filters):
             if flag==0:
                 data.append(self.data[i])
                 targets.append(self.targets[i])
                 
-        self.data=data
-        self.targets=targets
+        self.data=data[:int(length*(1-self.pruningSize))]
+        self.targets=targets[:int(length*(1-self.pruningSize))]
 
     def _handle_dataPruning(self):
         npyPath=self.lossChangePath
         lossChange_dict=np.load(self.lossChangePath, allow_pickle=True).item()
+        print(list(lossChange_dict.keys())[:5])
+        print(len(lossChange_dict))
         lossChange_dict_sorted=sorted(lossChange_dict.items(), key = lambda kv:(kv[1], kv[0]),reverse=False)
         #找到前一千条
         if self.pos==1:
-            dataToDelete=np.array(lossChange_dict_sorted)[:int(len(lossChange_dict)*self.pruningSize),[0]].flatten().astype(np.int16)
+            dataToSave=np.array(lossChange_dict_sorted)[int(len(lossChange_dict)*self.pruningSize):,[0]].flatten().astype(np.int32)
         elif self.pos==2:
-            prunNum=int(len(lossChange_dict)*self.pruningSize/2)
-            dataToDelete1=np.array(lossChange_dict_sorted)[:prunNum,[0]].flatten().astype(np.int16)
-            dataToDelete2=np.array(lossChange_dict_sorted)[-prunNum:,[0]].flatten().astype(np.int16)
-            dataToDelete=np.concatenate((dataToDelete1,dataToDelete2))
+            halfPrunNum=int(len(lossChange_dict)*self.pruningSize/2)
+            dataToSave=np.array(lossChange_dict_sorted)[halfPrunNum:-halfPrunNum,[0]].flatten().astype(np.int32)
         elif self.pos==3:
-            dataToDelete=np.array(lossChange_dict_sorted)[-int(len(lossChange_dict)*self.pruningSize):,[0]].flatten().astype(np.int16)
+            dataToSave=np.array(lossChange_dict_sorted)[:-int(len(lossChange_dict)*self.pruningSize),[0]].flatten().astype(np.int32)
         
         #1-10000 变成0-9999
-        dataToDelete=dataToDelete-1
-
-        #1是要删的
-        filters=np.zeros(len(lossChange_dict))
-        for delIndex in dataToDelete:
-            filters[delIndex]=1
+        dataToSave=dataToSave-1
 
         data=[]
         targets=[]
-
-        data_list=[]
-        for i,flag in enumerate(filters):
-            if flag==0:
-                data.append(self.data[i])
-                targets.append(self.targets[i])
+        for save_index in dataToSave:
+            data.append(self.data[save_index])
+            targets.append(self.targets[save_index])
+         
         self.data=data
         self.targets=targets
 
